@@ -57,22 +57,31 @@ def check_order():
 
 @app.route('/upload-to-s3', methods=['POST'])
 def upload_to_s3():
-    """Upload a file to AWS S3."""
-    if 'file' not in request.files:
-        return "No file part", 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return "No selected file", 400
+    """Upload order number to the database and S3."""
+    order_no = request.args.get('order-no')
+    if not order_no:
+        return "Missing 'order-no' parameter!", 400
 
     try:
-        # Upload the file to S3
-        s3.upload_fileobj(file, S3_BUCKET_NAME, file.filename)
-        return f"File {file.filename} uploaded successfully to S3!", 200
+        # Insert the order number into the database
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO orders (order_id) VALUES (?)", (order_no,))
+        conn.commit()
+        conn.close()
+
+        # Upload a confirmation file to S3
+        content = f"Order Number: {order_no}"
+        file_key = f"orders/{order_no}.txt"  # Store files in an "orders" folder in S3
+        s3.put_object(Body=content, Bucket=S3_BUCKET_NAME, Key=file_key)
+
+        return f"Order number {order_no} added to the database and uploaded to S3!", 200
+    except sqlite3.IntegrityError:
+        return f"Order number {order_no} already exists in the database.", 400
     except NoCredentialsError:
         return "Credentials not available", 403
     except Exception as e:
-        return f"Error uploading file: {e}", 500
+        return f"Error processing order number: {e}", 500
 
 
 if __name__ == '__main__':

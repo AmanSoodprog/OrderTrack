@@ -42,7 +42,7 @@ def check_woo():
                     awb_number = awb_response.get('awb_number')
                     if awb_number:
                         # Prepare order details with AWB number and tracking URL
-                        tracking_url = f"https://www.delhivery.com/track?awb={awb_number}"
+                        tracking_url = f"https://track.delhivery.com/api/v1/packages/json/?waybill={awb_number}"
                         json_data = {
                             "order_id": order_id,
                             "status": order_status,

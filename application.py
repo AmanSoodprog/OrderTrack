@@ -92,6 +92,10 @@ def get_awb_number(order_id):
         # Make the GET request to the Delhivery API with headers
         response = requests.get(api_url, headers=headers)
 
+        # Log response status and body for debugging
+        print(f"Delhivery API response code: {response.status_code}")
+        print(f"Delhivery API response body: {response.text}")
+
         if response.status_code == 200:
             data = response.json()
             # Check if we have valid package details in the response
@@ -102,14 +106,12 @@ def get_awb_number(order_id):
                 return None
         else:
             # Handle non-200 status codes
-            print(f"Delhivery API returned status code {response.status_code}")
-            print(f"Response: {response.text}")
+            print(f"Error: {response.status_code}, {response.text}")
             return None
     except requests.exceptions.RequestException as e:
         # Handle any errors that occur during the API request
         print(f"Error calling Delhivery API: {e}")
         return None
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

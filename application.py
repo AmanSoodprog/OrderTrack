@@ -68,7 +68,11 @@ def check_woo():
                         encoded_json = urllib.parse.quote(json_str)
 
                         # Redirect to the success page with the encoded JSON data in the URL
-                        return redirect(f'https://figureshub.in/order-shipped/?order-data={encoded_json}')
+                        if order_status == "completed":
+                            return redirect(f'https://figureshub.in/order-shipped/?order-data={encoded_json}')
+                        else:
+                            return redirect(f'https://figureshub.in/order-packing/?order-data={encoded_json}')
+                            
                     else:
                         return "AWB number not found for the order.", 404
                 else:

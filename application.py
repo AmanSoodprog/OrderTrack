@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 # Delhivery API details
 DELHIVERY_API_URL = "https://track.delhivery.com/api/v1/packages/json/"
-DELHIVERY_API_KEY = "5a7b27e8d938067996dbacce89a50cf909598111"
+DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
 
 # WooCommerce API credentials
 WOOCOMMERCE_URL = "https://figureshub.in/wp-json/wc/v3"

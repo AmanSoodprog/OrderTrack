@@ -99,14 +99,16 @@ def get_awb_number(order_id):
 
         if response.status_code == 200:
             data = response.json()
-            # Extract AWB number from the response
+
+            # Check if 'ShipmentData' exists and contains data
             shipment_data = data.get('ShipmentData', [])
             if shipment_data:
-                awb_number = data.get('ShipmentData', [{}])[0].get('AWB')
+                # Access the AWB number from 'Shipment' directly
+                awb_number = shipment_data[0].get('Shipment', {}).get('AWB')
                 if awb_number:
                     return {'awb_number': awb_number}
                 else:
-                    print("No AWB number found in ShipmentData.")
+                    print("No AWB number found in Shipment.")
                     return None
             else:
                 print("No ShipmentData found in the response.")

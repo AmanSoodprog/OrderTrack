@@ -2,7 +2,7 @@ from flask import Flask, request, redirect, jsonify
 import requests
 from requests.auth import HTTPBasicAuth
 import urllib.parse
-
+import json
 app = Flask(__name__)
 
 # WooCommerce API credentials

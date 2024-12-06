@@ -35,7 +35,7 @@ def check_woo():
 
             # Check if order is completed
             order_status = order_data.get('status', 'Unknown')
-            if order_status == 'completed':
+            if order_status == 'completed' or order_status == 'processing':
                 # Call Delhivery API to get AWB number for the completed order
                 awb_response = get_awb_number(order_id)
                 if awb_response:

@@ -102,7 +102,7 @@ def get_awb_number(order_id):
             # Extract AWB number from the response
             shipment_data = data.get('ShipmentData', [])
             if shipment_data:
-                awb_number = shipment_data[0].get('AWB')
+                awb_number = data.get('ShipmentData', [{}])[0].get('AWB')
                 if awb_number:
                     return {'awb_number': awb_number}
                 else:

@@ -37,12 +37,18 @@ def check_woo():
             order_status = order_data.get('status', 'Unknown')
             if order_status == 'completed' or order_status == 'processing':
                 # Call Delhivery API to get AWB number for the completed order
-                awb_response = get_awb_number(order_id)
-                if awb_response:
+                if order_status == 'completed': 
+                    awb_response = get_awb_number(order_id)
                     awb_number = awb_response.get('awb_number')
+                    tracking_url = f"https://www.delhivery.com/track-v2/package/{awb_number}"
+                else:
+                    awb_response = "1234"
+                    tracking_url = ""
+                if awb_response:
+                    
                     if awb_number:
                         # Prepare order details with AWB number and tracking URL
-                        tracking_url = f"https://www.delhivery.com/track-v2/package/{awb_number}"
+                        
                         json_data = {
                             "order_id": order_id,
                             "status": order_status,

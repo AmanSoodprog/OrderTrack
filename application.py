@@ -99,11 +99,17 @@ def get_awb_number(order_id):
 
         if response.status_code == 200:
             data = response.json()
-            # Check if we have valid package details in the response
-            if 'awb_number' in data:
-                return data
+            # Extract AWB number from the response
+            shipment_data = data.get('ShipmentData', [])
+            if shipment_data:
+                awb_number = shipment_data[0].get('AWB')
+                if awb_number:
+                    return {'awb_number': awb_number}
+                else:
+                    print("No AWB number found in ShipmentData.")
+                    return None
             else:
-                print("No AWB number found in the response.")
+                print("No ShipmentData found in the response.")
                 return None
         else:
             # Handle non-200 status codes
@@ -113,6 +119,7 @@ def get_awb_number(order_id):
         # Handle any errors that occur during the API request
         print(f"Error calling Delhivery API: {e}")
         return None
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

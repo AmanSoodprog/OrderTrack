@@ -16,9 +16,8 @@ S3_BUCKET_NAME = 'thehuborders'  # Replace with your S3 bucket name
 
 # WooCommerce API credentials
 WOOCOMMERCE_URL = "https://figureshub.in/wp-json/wc/v3"
-CONSUMER_KEY = "ck_your_consumer_key"  # Replace with your WooCommerce consumer key
-CONSUMER_SECRET = "cs_your_consumer_secret"  # Replace with your WooCommerce consumer secret
-
+CONSUMER_KEY = "ck_adf3760d0edad5ed2878b3098259457b14da15f1"
+CONSUMER_SECRET = "cs_be0f2a6b00625d5a90e770711aa7aef8823de913"
 # AWS S3 client (no need to manually provide keys if running on EC2 with an IAM role)
 s3 = boto3.client('s3')  # IAM role credentials will be automatically used
 
@@ -124,7 +123,6 @@ def check_woo():
             return f"Error retrieving order details: {response.status_code}, {response.text}", 500
     except Exception as e:
         return f"An error occurred: {e}", 500
-
 
 
 if __name__ == '__main__':

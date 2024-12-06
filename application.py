@@ -45,7 +45,7 @@ def check_woo():
             }
             # Convert JSON to a string and encode it for URL
             encoded_json = urllib.parse.quote(str(json_data))
-            return redirect(f'https://figureshub.in/order-shipped-3/?order-data={encoded_json}')
+            return redirect(f'https://figureshub.in/order-shipped/?order-data={encoded_json}')
         elif response.status_code == 404:
             return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
         else:

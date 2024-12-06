@@ -88,6 +88,7 @@ def get_awb_number(order_id):
     try:
         # Construct the API URL with the waybill parameter
         api_url = f"{DELHIVERY_API_URL}?waybill=&ref_ids={order_id}"
+        print(f"Making request to Delhivery API: {api_url}")  # Debugging log
 
         # Make the GET request to the Delhivery API with headers
         response = requests.get(api_url, headers=headers)

@@ -44,6 +44,7 @@ def check_woo():
                     tracking_url = f"https://www.delhivery.com/track-v2/package/{awb_number}"
                 else:
                     awb_response = "1234"
+                    awb_number = "1234"
                     tracking_url = ""
                 if awb_response:
                     

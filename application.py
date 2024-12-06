@@ -80,26 +80,30 @@ def check_woo():
 
 def get_awb_number(order_id):
     """Call the Delhivery API to get the AWB number for the given order ID."""
-    params = {
-        'waybill': order_id,
-    }
     headers = {
-        'Authorization': f'Bearer {DELHIVERY_API_KEY}'
+        'Content-Type': 'application/json',
+        'Authorization': f'Token {DELHIVERY_API_KEY}',  # Pass the API key as a Token
     }
 
     try:
-        # Make the GET request to the Delhivery API
-        response = requests.get(DELHIVERY_API_URL, params=params, headers=headers)
-        
+        # Construct the API URL with the waybill parameter
+        api_url = f"{DELHIVERY_API_URL}?waybill={order_id}"
+
+        # Make the GET request to the Delhivery API with headers
+        response = requests.get(api_url, headers=headers)
+
         if response.status_code == 200:
             data = response.json()
-            # Check if we have an AWB number in the response
+            # Check if we have valid package details in the response
             if 'awb_number' in data:
                 return data
             else:
+                print("No AWB number found in the response.")
                 return None
         else:
             # Handle non-200 status codes
+            print(f"Delhivery API returned status code {response.status_code}")
+            print(f"Response: {response.text}")
             return None
     except requests.exceptions.RequestException as e:
         # Handle any errors that occur during the API request

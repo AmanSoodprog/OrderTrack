@@ -1,9 +1,10 @@
-from flask import Flask, request, redirect, abort, jsonify
+from flask import Flask, request, redirect, jsonify
 import sqlite3
 import boto3
 from botocore.exceptions import NoCredentialsError
 import requests
 from requests.auth import HTTPBasicAuth
+import urllib.parse
 
 app = Flask(__name__)
 
@@ -15,8 +16,8 @@ S3_BUCKET_NAME = 'thehuborders'  # Replace with your S3 bucket name
 
 # WooCommerce API credentials
 WOOCOMMERCE_URL = "https://figureshub.in/wp-json/wc/v3"
-CONSUMER_KEY = "ck_adf3760d0edad5ed2878b3098259457b14da15f1"
-CONSUMER_SECRET = "cs_be0f2a6b00625d5a90e770711aa7aef8823de913"
+CONSUMER_KEY = "ck_your_consumer_key"  # Replace with your WooCommerce consumer key
+CONSUMER_SECRET = "cs_your_consumer_secret"  # Replace with your WooCommerce consumer secret
 
 # AWS S3 client (no need to manually provide keys if running on EC2 with an IAM role)
 s3 = boto3.client('s3')  # IAM role credentials will be automatically used
@@ -93,7 +94,7 @@ def upload_to_s3():
 
 @app.route('/check-woo', methods=['GET'])
 def check_woo():
-    """Retrieve order status from WooCommerce."""
+    """Retrieve order status from WooCommerce and redirect with JSON data."""
     order_id = request.args.get('order-id')
     if not order_id:
         return "Missing 'order-id' parameter!", 400
@@ -108,18 +109,22 @@ def check_woo():
         # Handle response
         if response.status_code == 200:
             order_data = response.json()
-            return jsonify({
+            json_data = {
                 "order_id": order_id,
                 "status": order_data.get('status', 'Unknown'),
                 "total": order_data.get('total', 'Unknown'),
                 "date_created": order_data.get('date_created', 'Unknown')
-            })
+            }
+            # Convert JSON to a string and encode it for URL
+            encoded_json = urllib.parse.quote(str(json_data))
+            return redirect(f'https://figureshub.in/order-shipped-3/?order-data={encoded_json}')
         elif response.status_code == 404:
-            return f"Order ID {order_id} not found in WooCommerce.", 404
+            return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
         else:
             return f"Error retrieving order details: {response.status_code}, {response.text}", 500
     except Exception as e:
         return f"An error occurred: {e}", 500
+
 
 
 if __name__ == '__main__':

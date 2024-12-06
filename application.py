@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 import requests
 from requests.auth import HTTPBasicAuth
+import json
 import urllib.parse
 
 app = Flask(__name__)
@@ -114,9 +115,9 @@ def check_woo():
                 "total": order_data.get('total', 'Unknown'),
                 "date_created": order_data.get('date_created', 'Unknown')
             }
-            # Convert JSON to a string and encode it for URL
-            encoded_json = urllib.parse.quote(str(json_data))
-            return redirect(f'https://figureshub.in/order-shipped/?order-data={encoded_json}')
+            # Use json.dumps() to ensure valid JSON and then URL-encode
+            encoded_json = urllib.parse.quote(json.dumps(json_data))
+            return redirect(f'https://figureshub.in/order-shipped-3/?order-data={encoded_json}')
         elif response.status_code == 404:
             return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
         else:

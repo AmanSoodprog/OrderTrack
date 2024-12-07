@@ -101,7 +101,7 @@ def check_woo():
                 if type=='F':
                     return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
                 else:
-                    return redirect(f'https://tcghub.in/your-order-is-getting-packed/?order-id={order_id}')
+                    return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
         
         elif response.status_code == 404:
             if type=='F':

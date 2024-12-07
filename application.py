@@ -107,7 +107,7 @@ def check_woo():
             if type=='F':
                 return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
             else:
-                return redirect(f'https://tcghub.in/your-order-is-getting-packed/?order-id={order_id}')
+                return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
         else:
             return f"Error retrieving order details: {response.status_code}, {response.text}", 500
 

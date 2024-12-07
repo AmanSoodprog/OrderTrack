@@ -87,7 +87,7 @@ def check_woo():
                             else:
                                 return redirect(f'https://tcghub.in/order-shipped/?order-data={encoded_json}')
                         else:
-                            if type=='T':
+                            if type=='F':
                                 return redirect(f'https://figureshub.in/order-packing/?order-data={encoded_json}')
                             else:
                                 return redirect(f'https://tcghub.in/order-packing/?order-data={encoded_json}')

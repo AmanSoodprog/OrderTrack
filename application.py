@@ -11,14 +11,24 @@ DELHIVERY_API_URL = "https://track.delhivery.com/api/v1/packages/json/"
 DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
 
 # WooCommerce API credentials
-WOOCOMMERCE_URL = "https://figureshub.in/wp-json/wc/v3"
-CONSUMER_KEY = "ck_adf3760d0edad5ed2878b3098259457b14da15f1"
-CONSUMER_SECRET = "cs_be0f2a6b00625d5a90e770711aa7aef8823de913"
+WOOCOMMERCE_URL = ""
+CONSUMER_KEY = ""
+CONSUMER_SECRET = ""
 
 @app.route('/check-woo', methods=['GET'])
 def check_woo():
     """Retrieve order status from WooCommerce and check if shipped. If shipped, fetch AWB from Delhivery."""
     order_id = request.args.get('order-id')
+    type = request.args.get('type')
+    if type == 'F':
+        WOOCOMMERCE_URL = "https://figureshub.in/wp-json/wc/v3"
+        CONSUMER_KEY = "ck_adf3760d0edad5ed2878b3098259457b14da15f1"
+        CONSUMER_SECRET = "cs_be0f2a6b00625d5a90e770711aa7aef8823de913"
+    elif type == 'T':
+        WOOCOMMERCE_URL = "https://tcghub.in/wp-json/wc/v3"
+        CONSUMER_KEY = "ck_0ce7629909f34c95a40f008d48e6c9262df56daa"
+        CONSUMER_SECRET = "cs_09b302e2e1c9e7e944b30751bf99287bb29db770"
+        
     if not order_id:
         return "Missing 'order-id' parameter!", 400
 
@@ -69,9 +79,15 @@ def check_woo():
 
                         # Redirect to the success page with the encoded JSON data in the URL
                         if order_status == "completed":
-                            return redirect(f'https://figureshub.in/order-shipped/?order-data={encoded_json}')
+                            if type=='F':
+                                return redirect(f'https://figureshub.in/order-shipped/?order-data={encoded_json}')
+                            else:
+                                return redirect(f'https://tcghub.in/order-shipped/?order-data={encoded_json}')
                         else:
-                            return redirect(f'https://figureshub.in/order-packing/?order-data={encoded_json}')
+                            if type=='T':
+                                return redirect(f'https://figureshub.in/order-packing/?order-data={encoded_json}')
+                            else:
+                                return redirect(f'https://tcghub.in/order-packing/?order-data={encoded_json}')
                             
                     else:
                         return "AWB number not found for the order.", 404
@@ -79,10 +95,16 @@ def check_woo():
                     return "Error fetching AWB from Delhivery API.", 500
             else:
                 # Order not completed, redirect to a different page
-                return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
+                if type=='F':
+                    return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
+                else:
+                    return redirect(f'https://tcghub.in/your-order-is-getting-packed/?order-id={order_id}')
         
         elif response.status_code == 404:
-            return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
+            if type=='F':
+                return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
+            else:
+                return redirect(f'https://tcghub.in/your-order-is-getting-packed/?order-id={order_id}')
         else:
             return f"Error retrieving order details: {response.status_code}, {response.text}", 500
 

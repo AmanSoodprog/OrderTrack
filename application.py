@@ -11,12 +11,15 @@ DELHIVERY_API_URL = "https://track.delhivery.com/api/v1/packages/json/"
 DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
 
 # WooCommerce API credentials
-WOOCOMMERCE_URL = ""
-CONSUMER_KEY = ""
-CONSUMER_SECRET = ""
+WOOCOMMERCE_URL = "X"
+CONSUMER_KEY = "X"
+CONSUMER_SECRET = "X"
 
 @app.route('/check-woo', methods=['GET'])
 def check_woo():
+    WOOCOMMERCE_URL = "X"
+    CONSUMER_KEY = "X"
+    CONSUMER_SECRET = "X"
     """Retrieve order status from WooCommerce and check if shipped. If shipped, fetch AWB from Delhivery."""
     order_id = request.args.get('order-id')
     type = request.args.get('type')

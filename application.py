@@ -14,19 +14,22 @@ DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
 SHIPROCKET_API_URL = "https://apiv2.shiprocket.in/v1/external/courier/track"
 SHIPROCKET_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjU1MzA4MjMsInNvdXJjZSI6InNyLWF1dGgtaW50IiwiZXhwIjoxNzQzNjA4MzMyLCJqdGkiOiIzdndTN25uWEpZdlhWM2FoIiwiaWF0IjoxNzQyNzQ0MzMyLCJpc3MiOiJodHRwczovL3NyLWF1dGguc2hpcHJvY2tldC5pbi9hdXRob3JpemUvdXNlciIsIm5iZiI6MTc0Mjc0NDMzMiwiY2lkIjozNzgyMDE2LCJ0YyI6MzYwLCJ2ZXJib3NlIjpmYWxzZSwidmVuZG9yX2lkIjowLCJ2ZW5kb3JfY29kZSI6Indvb2NvbW1lcmNlIn0.edcLdphgL7izCI2elwLI-vjzP-zK2vreoSSOA332qvI"  # Replace with your actual token
 
-# WooCommerce API credentials
+# WooCommerce API credentials (default placeholders)
 WOOCOMMERCE_URL = "X"
 CONSUMER_KEY = "X"
 CONSUMER_SECRET = "X"
 
 @app.route('/check-woo', methods=['GET'])
 def check_woo():
-    WOOCOMMERCE_URL = "X"
-    CONSUMER_KEY = "X"
-    CONSUMER_SECRET = "X"
     """Retrieve order status from WooCommerce and check if shipped. If shipped, fetch AWB from Delhivery or Shiprocket."""
     order_id = request.args.get('order-id')
     type = request.args.get('type')
+    
+    # Set WooCommerce credentials based on site type
+    WOOCOMMERCE_URL = "X"
+    CONSUMER_KEY = "X"
+    CONSUMER_SECRET = "X"
+    
     if type == 'F':
         WOOCOMMERCE_URL = "https://figureshub.in/wp-json/wc/v3"
         CONSUMER_KEY = "ck_adf3760d0edad5ed2878b3098259457b14da15f1"
@@ -62,17 +65,16 @@ def check_woo():
                 if order_status == 'completed':
                     # First try Delhivery API
                     delhivery_response = get_awb_number(order_id)
-                    if delhivery_response is not None:
-                        if delhivery_response and delhivery_response.get('awb_number'):
-                            # Delhivery AWB found
-                            awb_response = delhivery_response
-                            awb_number = awb_response.get('awb_number')
-                            tracking_url = f"https://www.delhivery.com/track-v2/package/{awb_number}"
+                    if delhivery_response is not None and delhivery_response.get('awb_number'):
+                        # Delhivery AWB found
+                        awb_response = delhivery_response
+                        awb_number = awb_response.get('awb_number')
+                        tracking_url = f"https://www.delhivery.com/track-v2/package/{awb_number}"
                     else:
                         # Delhivery AWB not found, try Shiprocket
-                        shiprocket_response = get_shiprocket_tracking(order_id, channel_id)
+                        shiprocket_response = get_shiprocket_tracking(order_id)
                         
-                        if shiprocket_response:
+                        if shiprocket_response and shiprocket_response.get('awb_number'):
                             awb_response = shiprocket_response
                             awb_number = awb_response.get('awb_number')
                             tracking_url = awb_response.get('tracking_url')
@@ -114,7 +116,10 @@ def check_woo():
                             return redirect(f'https://tcghub.in/order-packing/?order-data={encoded_json}')
                 else:
                     # No tracking info from either service
-                    return "AWB number not found for the order in either Delhivery or Shiprocket.", 404
+                    if type=='F':
+                        return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
+                    else:
+                        return redirect(f'https://tcghub.in/your-order-is-getting-packed/?order-id={order_id}')
             else:
                 # Order not completed, redirect to a different page
                 if type=='F':

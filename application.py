@@ -34,7 +34,7 @@ def check_woo():
         consumer_secret = "cs_be0f2a6b00625d5a90e770711aa7aef8823de913"
         base_url = "https://figureshub.in"
     elif type_param == 'T':
-        woocommerce_url = "https://tcghub.in/wppp-json/wc/v3"
+        woocommerce_url = "https://tcghub.in/wp-json/wc/v3"
         consumer_key = "ck_0ce7629909f34c95a40f008d48e6c9262df56daa"
         consumer_secret = "cs_09b302e2e1c9e7e944b30751bf99287bb29db770"
         base_url = "https://tcghub.in"

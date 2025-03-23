@@ -12,7 +12,7 @@ DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
 
 # Shiprocket API details
 SHIPROCKET_API_URL = "https://apiv2.shiprocket.in/v1/external/courier/track"
-SHIPROCKET_TOKEN = "YOUR_SHIPROCKET_TOKEN"  # Replace with your actual token
+SHIPROCKET_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjU1MzA4MjMsInNvdXJjZSI6InNyLWF1dGgtaW50IiwiZXhwIjoxNzQzNjA4MzMyLCJqdGkiOiIzdndTN25uWEpZdlhWM2FoIiwiaWF0IjoxNzQyNzQ0MzMyLCJpc3MiOiJodHRwczovL3NyLWF1dGguc2hpcHJvY2tldC5pbi9hdXRob3JpemUvdXNlciIsIm5iZiI6MTc0Mjc0NDMzMiwiY2lkIjozNzgyMDE2LCJ0YyI6MzYwLCJ2ZXJib3NlIjpmYWxzZSwidmVuZG9yX2lkIjowLCJ2ZW5kb3JfY29kZSI6Indvb2NvbW1lcmNlIn0.edcLdphgL7izCI2elwLI-vjzP-zK2vreoSSOA332qvI"  # Replace with your actual token
 
 # WooCommerce API credentials
 WOOCOMMERCE_URL = "X"

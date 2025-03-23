@@ -12,7 +12,7 @@ DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
 
 # Shiprocket API details
 SHIPROCKET_API_URL = "https://apiv2.shiprocket.in/v1/external/courier/track"
-SHIPROCKET_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjU1MzA4MjMsInNvdXJjZSI6InNyLWF1dGgtaW50IiwiZXhwIjoxNzQzNjA4MzMyLCJqdGkiOiIzdndTN25uWEpZdlhWM2FoIiwiaWF0IjoxNzQyNzQ0MzMyLCJpc3MiOiJodHRwczovL3NyLWF1dGguc2hpcHJvY2tldC5pbi9hdXRob3JpemUvdXNlciIsIm5iZiI6MTc0Mjc0NDMzMiwiY2lkIjozNzgyMDE2LCJ0YyI6MzYwLCJ2ZXJib3NlIjpmYWxzZSwidmVuZG9yX2lkIjowLCJ2ZW5kb3JfY29kZSI6Indvb2NvbW1lcmNlIn0.edcLdphgL7izCI2elwLI-vjzP-zK2vreoSSOA332qvI"  # Replace with your actual token
+SHIPROCKET_TOKEN = "YOUR_SHIPROCKET_TOKEN"  # Replace with your actual token
 
 # WooCommerce API credentials
 WOOCOMMERCE_URL = "X"
@@ -28,10 +28,10 @@ def check_woo():
     order_id = request.args.get('order-id')
     type = request.args.get('type')
     if type == 'F':
-        WOOCOMMERCE_URL = "https://tcghub.in/wp-json/wc/v3"
+        WOOCOMMERCE_URL = "https://figureshub.in/wp-json/wc/v3"
         CONSUMER_KEY = "ck_adf3760d0edad5ed2878b3098259457b14da15f1"
         CONSUMER_SECRET = "cs_be0f2a6b00625d5a90e770711aa7aef8823de913"
-        channel_id = "YOUR_tcghub_CHANNEL_ID"  # Replace with your actual channel ID
+        channel_id = "YOUR_FIGURESHUB_CHANNEL_ID"  # Replace with your actual channel ID
     elif type == 'T':
         WOOCOMMERCE_URL = "https://tcghub.in/wp-json/wc/v3"
         CONSUMER_KEY = "ck_0ce7629909f34c95a40f008d48e6c9262df56daa"
@@ -42,10 +42,15 @@ def check_woo():
         return "Missing 'order-id' parameter!", 400
 
     try:
-        # Call WooCommerce API to fetch order details
+        # Call WooCommerce API to fetch order details with custom headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json'
+        }
         response = requests.get(
             f"{WOOCOMMERCE_URL}/orders/{order_id}",
-            auth=HTTPBasicAuth(CONSUMER_KEY, CONSUMER_SECRET)
+            auth=HTTPBasicAuth(CONSUMER_KEY, CONSUMER_SECRET),
+            headers=headers
         )
 
         # Handle response
@@ -64,19 +69,26 @@ def check_woo():
                     # First try Delhivery API
                     delhivery_response = get_awb_number(order_id)
                     
-                    if delhivery_response and delhivery_response.get('awb_number'):
+                    if delhivery_response is not None and delhivery_response.get('awb_number'):
                         # Delhivery AWB found
                         awb_response = delhivery_response
                         awb_number = awb_response.get('awb_number')
                         tracking_url = f"https://www.delhivery.com/track-v2/package/{awb_number}"
                     else:
                         # Delhivery AWB not found, try Shiprocket
+                        print("No Delhivery AWB found, trying Shiprocket...")
                         shiprocket_response = get_shiprocket_tracking(order_id, channel_id)
                         
-                        if shiprocket_response:
+                        if shiprocket_response is not None:
                             awb_response = shiprocket_response
-                            awb_number = awb_response.get('awb_number')
-                            tracking_url = awb_response.get('tracking_url')
+                            awb_number = shiprocket_response.get('awb_number')
+                            tracking_url = shiprocket_response.get('tracking_url')
+                            print(f"Shiprocket tracking found: AWB={awb_number}, URL={tracking_url}")
+                        else:
+                            print("No Shiprocket tracking found either.")
+                            # Initialize with empty values to avoid None errors
+                            awb_response = {}
+                            awb_number = None
                 else:
                     # For processing orders
                     awb_response = "1234"
@@ -84,7 +96,7 @@ def check_woo():
                     tracking_url = ""
                 
                 # Check if we have tracking details from either Delhivery or Shiprocket
-                if awb_number:
+                if awb_number is not None:
                     # Prepare order details with AWB number and tracking URL
                     json_data = {
                         "order_id": order_id,
@@ -105,27 +117,32 @@ def check_woo():
                     # Redirect to the appropriate page
                     if order_status == "completed":
                         if type=='F':
-                            return redirect(f'https://tcghub.in/order-shipped/?order-data={encoded_json}')
+                            return redirect(f'https://figureshub.in/order-shipped/?order-data={encoded_json}')
                         else:
                             return redirect(f'https://tcghub.in/order-shipped/?order-data={encoded_json}')
                     else:
                         if type=='F':
-                            return redirect(f'https://tcghub.in/order-packing/?order-data={encoded_json}')
+                            return redirect(f'https://figureshub.in/order-packing/?order-data={encoded_json}')
                         else:
                             return redirect(f'https://tcghub.in/order-packing/?order-data={encoded_json}')
                 else:
                     # No tracking info from either service
-                    return "AWB number not found for the order in either Delhivery or Shiprocket.", 404
+                    print(f"No tracking information found for order {order_id} in either Delhivery or Shiprocket")
+                    # Redirect to a default page for completed orders without tracking
+                    if type=='F':
+                        return redirect(f'https://figureshub.in/order-shipped-without-tracking/?order-id={order_id}')
+                    else:
+                        return redirect(f'https://tcghub.in/order-shipped-without-tracking/?order-id={order_id}')
             else:
                 # Order not completed, redirect to a different page
                 if type=='F':
-                    return redirect(f'https://tcghub.in/your-order-is-getting-packed/?order-id={order_id}')
+                    return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
                 else:
                     return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
         
         elif response.status_code == 404:
             if type=='F':
-                return redirect(f'https://tcghub.in/your-order-is-getting-packed/?order-id={order_id}')
+                return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
             else:
                 return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
         else:

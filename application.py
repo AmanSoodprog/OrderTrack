@@ -17,8 +17,7 @@ DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
 
 # Shiprocket API details
 SHIPROCKET_API_URL = "https://apiv2.shiprocket.in/v1/external/courier/track"
-SHIPROCKET_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjcyNTY1NzAsInNvdXJjZSI6InNyLWF1dGgtaW50IiwiZXhwIjoxNzU0NjY3NjMzLCJqdGkiOiI0VENaRjV3Um1oc0t4d2E3IiwiaWF0IjoxNzUzODAzNjMzLCJpc3MiOiJodHRwczovL3NyLWF1dGguc2hpcHJvY2tldC5pbi9hdXRob3JpemUvdXNlciIsIm5iZiI6MTc1MzgwMzYzMywiY2lkIjozNzgyMDE2LCJ0YyI6MzYwLCJ2ZXJib3NlIjpmYWxzZSwidmVuZG9yX2lkIjowLCJ2ZW5kb3JfY29kZSI6Indvb2NvbW1lcmNlIn0.JaKHmVrBccA-e3o9P0C668vH05-woB-4PzzlX94JoPM"
-@app.route('/check-woo', methods=['GET'])
+SHIPROCKET_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjcyNTY1NzAsInNvdXJjZSI6InNyLWF1dGgtaW50IiwiZXhwIjoxNzU1ODg4MDQwLCJqdGkiOiJDWXF1Y1pqMDBGdjVmRFk3IiwiaWF0IjoxNzU1MDI0MDQwLCJpc3MiOiJodHRwczovL3NyLWF1dGguc2hpcHJvY2tldC5pbi9hdXRob3JpemUvdXNlciIsIm5iZiI6MTc1NTAyNDA0MCwiY2lkIjozNzgyMDE2LCJ0YyI6MzYwLCJ2ZXJib3NlIjpmYWxzZSwidmVuZG9yX2lkIjowLCJ2ZW5kb3JfY29kZSI6Indvb2NvbW1lcmNlIn0.Fyoii1Tl66CJVZqcwczOwcFkVXzS-5lPW1tUi-Ft9R8"
 def check_woo():
     """Retrieve order status from WooCommerce and check if shipped. If shipped, fetch AWB from Delhivery or Shiprocket."""
     order_id = request.args.get('order-id')

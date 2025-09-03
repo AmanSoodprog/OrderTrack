@@ -4,6 +4,11 @@ from requests.auth import HTTPBasicAuth
 import urllib.parse
 import json
 import logging
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -11,13 +16,35 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Delhivery API details
+# Get API credentials from environment variables
 DELHIVERY_API_URL = "https://track.delhivery.com/api/v1/packages/json/"
-DELHIVERY_API_KEY = "a4d484e7d39015a655fd6b3c6c10152adf7a49c5"
+DELHIVERY_API_KEY = os.getenv('DELHIVERY_API_KEY')
 
-# Shiprocket API details
 SHIPROCKET_API_URL = "https://apiv2.shiprocket.in/v1/external/courier/track"
-SHIPROCKET_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjcyNTY1NzAsInNvdXJjZSI6InNyLWF1dGgtaW50IiwiZXhwIjoxNzU2ODkyMzQ3LCJqdGkiOiJOZUV1eG9mTTNiMGZqcnZNIiwiaWF0IjoxNzU2MDI4MzQ3LCJpc3MiOiJodHRwczovL3NyLWF1dGguc2hpcHJvY2tldC5pbi9hdXRob3JpemUvdXNlciIsIm5iZiI6MTc1NjAyODM0NywiY2lkIjozNzgyMDE2LCJ0YyI6MzYwLCJ2ZXJib3NlIjpmYWxzZSwidmVuZG9yX2lkIjowLCJ2ZW5kb3JfY29kZSI6Indvb2NvbW1lcmNlIn0.Sw0PAP_jvsNaxpe56xHDdN63nQ2QxkI6cfw_5wHBiKs"
+SHIPROCKET_TOKEN = os.getenv('SHIPROCKET_TOKEN')
+
+# WooCommerce credentials for FiguresHub
+FIGURESHUB_CONSUMER_KEY = os.getenv('FIGURESHUB_CONSUMER_KEY')
+FIGURESHUB_CONSUMER_SECRET = os.getenv('FIGURESHUB_CONSUMER_SECRET')
+
+# WooCommerce credentials for TCGHub
+TCGHUB_CONSUMER_KEY = os.getenv('TCGHUB_CONSUMER_KEY')
+TCGHUB_CONSUMER_SECRET = os.getenv('TCGHUB_CONSUMER_SECRET')
+
+# Validate that all required environment variables are set
+required_env_vars = [
+    'DELHIVERY_API_KEY',
+    'SHIPROCKET_TOKEN',
+    'FIGURESHUB_CONSUMER_KEY',
+    'FIGURESHUB_CONSUMER_SECRET',
+    'TCGHUB_CONSUMER_KEY',
+    'TCGHUB_CONSUMER_SECRET'
+]
+
+missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+if missing_vars:
+    logger.error(f"Missing required environment variables: {missing_vars}")
+    raise ValueError(f"Missing required environment variables: {missing_vars}")
 
 @app.route('/check-woo', methods=['GET'])
 def check_woo():
@@ -30,13 +57,13 @@ def check_woo():
     # Set WooCommerce credentials based on site type
     if type_param == 'F':
         woocommerce_url = "https://figureshub.in/wp-json/wc/v3"
-        consumer_key = "ck_adf3760d0edad5ed2878b3098259457b14da15f1"
-        consumer_secret = "cs_be0f2a6b00625d5a90e770711aa7aef8823de913"
+        consumer_key = FIGURESHUB_CONSUMER_KEY
+        consumer_secret = FIGURESHUB_CONSUMER_SECRET
         base_url = "https://figureshub.in"
     elif type_param == 'T':
         woocommerce_url = "https://tcghub.in/wp-json/wc/v3"
-        consumer_key = "ck_0ce7629909f34c95a40f008d48e6c9262df56daa"
-        consumer_secret = "cs_09b302e2e1c9e7e944b30751bf99287bb29db770"
+        consumer_key = TCGHUB_CONSUMER_KEY
+        consumer_secret = TCGHUB_CONSUMER_SECRET
         base_url = "https://tcghub.in"
     else:
         return "Invalid 'type' parameter. Must be 'F' or 'T'.", 400

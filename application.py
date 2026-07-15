@@ -228,8 +228,8 @@ def _client_ip():
 
 
 def check_rate_limit(ip):
-    """Return None if the request is allowed, or a Flask response to return
-    immediately (429) if the IP is currently banned or just tripped the limit.
+    """Return None if the request is allowed, or the number of seconds until
+    the ban clears if this IP is currently banned or just tripped the limit.
 
     Sliding-window counter: logs a hit, counts hits for this IP within the
     last RATE_LIMIT_WINDOW_SECONDS, and bans the IP for RATE_LIMIT_BAN_SECONDS
@@ -246,10 +246,7 @@ def check_rate_limit(ip):
         if row and row[0] > now:
             retry_after = int(row[0] - now)
             logger.warning(f"Rate limit: blocked request from banned IP {ip} ({retry_after}s remaining)")
-            resp = jsonify({"error": "Too many requests. Please try again later."})
-            resp.status_code = 429
-            resp.headers["Retry-After"] = str(retry_after)
-            return resp
+            return retry_after
         if row and row[0] <= now:
             # Ban expired — clean it up.
             conn.execute("DELETE FROM rate_limit_bans WHERE ip = ?", (ip,))
@@ -275,12 +272,21 @@ def check_rate_limit(ip):
                 f"Rate limit: {ip} exceeded {RATE_LIMIT_MAX_ATTEMPTS} attempts in "
                 f"{RATE_LIMIT_WINDOW_SECONDS}s — banned for {RATE_LIMIT_BAN_SECONDS}s"
             )
-            resp = jsonify({"error": "Too many requests. Please try again later."})
-            resp.status_code = 429
-            resp.headers["Retry-After"] = str(RATE_LIMIT_BAN_SECONDS)
-            return resp
+            return RATE_LIMIT_BAN_SECONDS
 
     return None  # allowed
+
+
+# A path that must NOT correspond to any real page/post on either WordPress
+# site. Redirecting here makes WordPress fall through to the theme's own
+# 404.php automatically — that's how WP's routing works for any URL that
+# doesn't match a rewrite rule, no special handling needed on the WP side.
+#
+# Deliberately meaningless (no "rate-limit" or similar in it) so a visitor
+# who gets redirected here just sees an ordinary broken-link 404, with no
+# signal that they specifically tripped a rate limit rather than, say,
+# mistyping a URL or clicking a stale link.
+RATE_LIMIT_404_PATH = "/x8k2mq7z/"
 
 
 # -----------------------------------------------------------------------------
@@ -292,12 +298,6 @@ def check_woo():
     """Retrieve order status from WooCommerce and check if shipped. If shipped,
     fetch AWB from Delhivery or Shiprocket, then redirect with an opaque token
     (no order data in the URL)."""
-    # Rate limit first — before touching WooCommerce, Delhivery, or Shiprocket
-    # — so a banned IP costs us nothing beyond a cheap SQLite lookup.
-    limited = check_rate_limit(_client_ip())
-    if limited is not None:
-        return limited
-
     order_id = request.args.get('order-id')
     type_param = request.args.get('type')
     order_key = request.args.get('key')  # WooCommerce order_key (for IDOR check)
@@ -317,6 +317,17 @@ def check_woo():
         base_url = "https://tcghub.in"
     else:
         return "Invalid 'type' parameter. Must be 'F' or 'T'.", 400
+
+    # Rate limit — checked once we know which site to send a banned visitor
+    # back to. Still happens before any WooCommerce/Delhivery/Shiprocket call,
+    # so a banned IP costs us nothing beyond a cheap SQLite lookup.
+    retry_after = check_rate_limit(_client_ip())
+    if retry_after is not None:
+        # No Retry-After header here on purpose — that header would itself
+        # signal "this is a rate limit" to anyone inspecting the response.
+        # A plain redirect to a dead page is indistinguishable from any
+        # other broken link.
+        return redirect(f'{base_url}{RATE_LIMIT_404_PATH}')
 
     if not order_id:
         return "Missing 'order-id' parameter!", 400

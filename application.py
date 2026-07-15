@@ -260,18 +260,24 @@ def check_woo():
                 try:
                     line_items = order_data.get('line_items', [])
 
+                    # Full order date+time as WooCommerce returns it, e.g.
+                    # "2026-07-14T18:32:07". Not price data, so safe to include
+                    # in the trimmed payload alongside first_item.
+                    date_created = order_data.get('date_created', '')
+
                     if awb_number:
                         if order_status == "completed":
-                            # Shipped: tracking link only.
+                            # Shipped: tracking link + order date only.
                             json_data = {
                                 "order_id": order_id,
                                 "status": order_status,
                                 "tracking_url": tracking_url,
+                                "date_created": date_created,
                             }
                             token = create_token(json_data)
                             redirect_url = f'{base_url}/order-shipped/?token={token}'
                         else:
-                            # Packing: first item only, plus a flag for "and more".
+                            # Packing: first item + order date, plus a flag for "and more".
                             first_item = None
                             if line_items:
                                 first_item = {
@@ -283,6 +289,7 @@ def check_woo():
                                 "status": order_status,
                                 "first_item": first_item,
                                 "has_more_items": len(line_items) > 1,
+                                "date_created": date_created,
                             }
                             token = create_token(json_data)
                             redirect_url = f'{base_url}/order-packing/?token={token}'

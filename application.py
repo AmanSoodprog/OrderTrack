@@ -59,6 +59,21 @@ TOKEN_TTL = int(os.getenv('TOKEN_TTL', '1800'))
 #      its own "View order" / order-received URLs.)
 REQUIRE_ORDER_KEY = os.getenv('REQUIRE_ORDER_KEY', '0') == '1'
 
+# --- Rate limiting for /check-woo ---------------------------------------------
+# Protects against someone (manually or via script) walking through order
+# numbers on the public /check-woo endpoint. Deliberately NOT applied to
+# /order-data — that endpoint is called server-to-server by WordPress
+# (wp_remote_get), so every customer's request arrives from the SAME
+# WordPress-server IP; rate-limiting it by IP would throttle everyone at once
+# rather than the one person enumerating.
+#
+# This is a deterrent against fast/scripted enumeration, not a full fix — a
+# patient attacker pacing requests below the threshold won't trip it. The
+# actual fix for enumeration is REQUIRE_ORDER_KEY above.
+RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv('RATE_LIMIT_MAX_ATTEMPTS', '8'))     # attempts allowed...
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv('RATE_LIMIT_WINDOW_SECONDS', '300'))  # ...within this window (5 min)
+RATE_LIMIT_BAN_SECONDS = int(os.getenv('RATE_LIMIT_BAN_SECONDS', '1800'))   # then blocked for this long (30 min)
+
 # Validate that all required environment variables are set
 required_env_vars = [
     'DELHIVERY_API_KEY',
@@ -101,6 +116,26 @@ def _init_token_store():
                 token   TEXT PRIMARY KEY,
                 data    TEXT NOT NULL,
                 expires REAL NOT NULL
+            )
+            """
+        )
+        # Rolling log of hit timestamps per IP, used to count attempts within
+        # the rate-limit window.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rate_limit_hits (
+                ip TEXT NOT NULL,
+                ts REAL NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rate_limit_hits_ip ON rate_limit_hits (ip)")
+        # Active bans: an IP stays here until banned_until passes.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rate_limit_bans (
+                ip TEXT PRIMARY KEY,
+                banned_until REAL NOT NULL
             )
             """
         )
@@ -174,6 +209,80 @@ def is_past_24_hours(order_data):
         return False
 
 
+def _client_ip():
+    """Best-effort client IP.
+
+    Currently Flask is hit directly on port 5000 with no reverse proxy in
+    front of it, so request.remote_addr is the real client IP. If you later
+    put Nginx (or anything else) in front of this app — e.g. for the HTTPS
+    subdomain setup — you MUST switch this to read X-Forwarded-For instead,
+    otherwise every request will appear to come from the proxy's IP and
+    everyone will share one rate-limit bucket. Flip USE_X_FORWARDED_FOR=1 in
+    the env once that's in place.
+    """
+    if os.getenv('USE_X_FORWARDED_FOR', '0') == '1':
+        forwarded = request.headers.get('X-Forwarded-For', '')
+        if forwarded:
+            return forwarded.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def check_rate_limit(ip):
+    """Return None if the request is allowed, or a Flask response to return
+    immediately (429) if the IP is currently banned or just tripped the limit.
+
+    Sliding-window counter: logs a hit, counts hits for this IP within the
+    last RATE_LIMIT_WINDOW_SECONDS, and bans the IP for RATE_LIMIT_BAN_SECONDS
+    once RATE_LIMIT_MAX_ATTEMPTS is exceeded. Only meant for /check-woo — see
+    the config comment above for why /order-data is deliberately excluded.
+    """
+    now = time.time()
+
+    with _db() as conn:
+        # Already banned?
+        row = conn.execute(
+            "SELECT banned_until FROM rate_limit_bans WHERE ip = ?", (ip,)
+        ).fetchone()
+        if row and row[0] > now:
+            retry_after = int(row[0] - now)
+            logger.warning(f"Rate limit: blocked request from banned IP {ip} ({retry_after}s remaining)")
+            resp = jsonify({"error": "Too many requests. Please try again later."})
+            resp.status_code = 429
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp
+        if row and row[0] <= now:
+            # Ban expired — clean it up.
+            conn.execute("DELETE FROM rate_limit_bans WHERE ip = ?", (ip,))
+
+        # Log this hit, then count hits within the window.
+        conn.execute("INSERT INTO rate_limit_hits (ip, ts) VALUES (?, ?)", (ip, now))
+        window_start = now - RATE_LIMIT_WINDOW_SECONDS
+        conn.execute("DELETE FROM rate_limit_hits WHERE ip = ? AND ts < ?", (ip, window_start))
+        count = conn.execute(
+            "SELECT COUNT(*) FROM rate_limit_hits WHERE ip = ? AND ts >= ?",
+            (ip, window_start),
+        ).fetchone()[0]
+
+        if count > RATE_LIMIT_MAX_ATTEMPTS:
+            banned_until = now + RATE_LIMIT_BAN_SECONDS
+            conn.execute(
+                "INSERT INTO rate_limit_bans (ip, banned_until) VALUES (?, ?) "
+                "ON CONFLICT(ip) DO UPDATE SET banned_until = excluded.banned_until",
+                (ip, banned_until),
+            )
+            conn.execute("DELETE FROM rate_limit_hits WHERE ip = ?", (ip,))
+            logger.warning(
+                f"Rate limit: {ip} exceeded {RATE_LIMIT_MAX_ATTEMPTS} attempts in "
+                f"{RATE_LIMIT_WINDOW_SECONDS}s — banned for {RATE_LIMIT_BAN_SECONDS}s"
+            )
+            resp = jsonify({"error": "Too many requests. Please try again later."})
+            resp.status_code = 429
+            resp.headers["Retry-After"] = str(RATE_LIMIT_BAN_SECONDS)
+            return resp
+
+    return None  # allowed
+
+
 # -----------------------------------------------------------------------------
 # Routes
 # -----------------------------------------------------------------------------
@@ -183,6 +292,12 @@ def check_woo():
     """Retrieve order status from WooCommerce and check if shipped. If shipped,
     fetch AWB from Delhivery or Shiprocket, then redirect with an opaque token
     (no order data in the URL)."""
+    # Rate limit first — before touching WooCommerce, Delhivery, or Shiprocket
+    # — so a banned IP costs us nothing beyond a cheap SQLite lookup.
+    limited = check_rate_limit(_client_ip())
+    if limited is not None:
+        return limited
+
     order_id = request.args.get('order-id')
     type_param = request.args.get('type')
     order_key = request.args.get('key')  # WooCommerce order_key (for IDOR check)
@@ -475,4 +590,5 @@ def get_shiprocket_tracking(order_id):
 @app.route('/', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy", "message": "Order tracking service is running"})
+
 

@@ -7,6 +7,7 @@ import os
 import time
 import secrets
 import sqlite3
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -150,6 +151,29 @@ def read_token(token):
 _init_token_store()
 
 
+def is_past_24_hours(order_data):
+    """Return True if it's been 24+ hours since the order was placed.
+
+    Uses date_created_gmt (UTC) rather than date_created (site local time) so
+    the comparison against utcnow() is correct regardless of the store's
+    timezone setting. Falls back to date_created if the gmt field is missing,
+    and returns False (safe default: stays on "Being Packed") if neither can
+    be parsed.
+    """
+    raw = order_data.get('date_created_gmt') or order_data.get('date_created')
+    if not raw:
+        return False
+    try:
+        order_time = datetime.fromisoformat(raw)
+        if order_time.tzinfo is None:
+            order_time = order_time.replace(tzinfo=timezone.utc)
+        elapsed = datetime.now(timezone.utc) - order_time
+        return elapsed.total_seconds() >= 24 * 3600
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Could not parse order date for 24h check: {raw} ({e})")
+        return False
+
+
 # -----------------------------------------------------------------------------
 # Routes
 # -----------------------------------------------------------------------------
@@ -290,6 +314,10 @@ def check_woo():
                                 "first_item": first_item,
                                 "has_more_items": len(line_items) > 1,
                                 "date_created": date_created,
+                                # True once 24h have passed since the order was
+                                # placed — tells the frontend which of the 3
+                                # progress-bar stages is current.
+                                "order_packed": is_past_24_hours(order_data),
                             }
                             token = create_token(json_data)
                             redirect_url = f'{base_url}/order-packing/?token={token}'
@@ -447,5 +475,4 @@ def get_shiprocket_tracking(order_id):
 @app.route('/', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy", "message": "Order tracking service is running"})
-
 

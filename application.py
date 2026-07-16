@@ -45,19 +45,13 @@ TOKEN_DB_PATH = os.getenv('TOKEN_DB_PATH', 'order_tokens.db')
 # that a shared/leaked link goes dead quickly.
 TOKEN_TTL = int(os.getenv('TOKEN_TTL', '1800'))
 
-# --- IDOR protection (STRONGLY RECOMMENDED — read the note below) -------------
-# When True, /check-woo requires a &key=<woocommerce_order_key> that must match
-# the order's real order_key before any data is returned. This stops someone
-# from simply incrementing order-id to read other customers' orders.
-#
-# Leaving this False keeps your current behaviour working immediately, but the
-# IDOR hole remains open. To turn it on:
-#   1. Set REQUIRE_ORDER_KEY = True (or env REQUIRE_ORDER_KEY=1)
-#   2. Update wherever you generate the "track order" link so it includes the
-#      order key, e.g.:  /check-woo?order-id=123&type=F&key=wc_order_AbC123...
-#      (WooCommerce already creates this per-order secret; it's the same key in
-#      its own "View order" / order-received URLs.)
-REQUIRE_ORDER_KEY = os.getenv('REQUIRE_ORDER_KEY', '0') == '1'
+# --- Email verification (closes the order-number enumeration hole) -----------
+# /check-woo now requires &email=<billing email on the order>, verified against
+# WooCommerce's order.billing.email before any data is returned. Without this,
+# an order NUMBER ALONE was enough to see another customer's items/tracking —
+# this is what actually stops that, since an attacker would also need to know
+# the real customer's email for each order-id they try.
+REQUIRE_EMAIL_VERIFICATION = os.getenv('REQUIRE_EMAIL_VERIFICATION', '1') == '1'
 
 # --- Rate limiting for /check-woo ---------------------------------------------
 # Protects against someone (manually or via script) walking through order
@@ -67,9 +61,10 @@ REQUIRE_ORDER_KEY = os.getenv('REQUIRE_ORDER_KEY', '0') == '1'
 # WordPress-server IP; rate-limiting it by IP would throttle everyone at once
 # rather than the one person enumerating.
 #
-# This is a deterrent against fast/scripted enumeration, not a full fix — a
-# patient attacker pacing requests below the threshold won't trip it. The
-# actual fix for enumeration is REQUIRE_ORDER_KEY above.
+# This is a deterrent against fast/scripted enumeration, not a full fix on
+# its own — a patient attacker pacing requests below the threshold won't trip
+# it. The actual fix for enumeration is REQUIRE_EMAIL_VERIFICATION above,
+# which this now works alongside.
 RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv('RATE_LIMIT_MAX_ATTEMPTS', '8'))     # attempts allowed...
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv('RATE_LIMIT_WINDOW_SECONDS', '300'))  # ...within this window (5 min)
 RATE_LIMIT_BAN_SECONDS = int(os.getenv('RATE_LIMIT_BAN_SECONDS', '1800'))   # then blocked for this long (30 min)
@@ -289,6 +284,21 @@ def check_rate_limit(ip):
 RATE_LIMIT_404_PATH = "/x8k2mq7z/"
 
 
+def not_found_redirect(order_id, type_param):
+    """The single 'can't show you this order' response, used for BOTH a
+    genuinely nonexistent order-id AND a valid order-id with a wrong/missing
+    email. Using the exact same response for both cases is deliberate: if a
+    wrong email got a different response than a nonexistent order, an
+    attacker could use ANY random email to enumerate which order-ids are
+    real, without ever needing to guess a correct email. Keeping the two
+    indistinguishable closes that gap.
+    """
+    if type_param == 'F':
+        return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
+    else:
+        return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
+
+
 # -----------------------------------------------------------------------------
 # Routes
 # -----------------------------------------------------------------------------
@@ -300,7 +310,7 @@ def check_woo():
     (no order data in the URL)."""
     order_id = request.args.get('order-id')
     type_param = request.args.get('type')
-    order_key = request.args.get('key')  # WooCommerce order_key (for IDOR check)
+    email = (request.args.get('email') or '').strip().lower()
 
     logger.info(f"Received request for order ID: {order_id}, type: {type_param}")
 
@@ -332,6 +342,9 @@ def check_woo():
     if not order_id:
         return "Missing 'order-id' parameter!", 400
 
+    if REQUIRE_EMAIL_VERIFICATION and not email:
+        return "Missing 'email' parameter!", 400
+
     try:
         # Call WooCommerce API to fetch order details
         logger.info(f"Calling WooCommerce API for order {order_id}")
@@ -346,14 +359,15 @@ def check_woo():
             order_data = response.json()
             logger.info(f"WooCommerce API returned data for order {order_id}")
 
-            # --- IDOR protection ---------------------------------------------
-            if REQUIRE_ORDER_KEY:
-                real_key = order_data.get('order_key')
-                if not order_key or not real_key or order_key != real_key:
+            # --- Email verification (the actual fix for enumeration) --------
+            if REQUIRE_EMAIL_VERIFICATION:
+                order_email = (order_data.get('billing', {}).get('email') or '').strip().lower()
+                if not order_email or email != order_email:
                     logger.warning(
-                        f"Order key mismatch/missing for order {order_id} — refusing."
+                        f"Email mismatch for order {order_id} from {_client_ip()} — refusing."
                     )
-                    return "Unauthorized: invalid or missing order key.", 403
+                    # Same response as "order not found" — see not_found_redirect().
+                    return not_found_redirect(order_id, type_param)
 
             # Check if order is completed or processing
             order_status = order_data.get('status', 'Unknown')
@@ -458,27 +472,18 @@ def check_woo():
                     return redirect(f'{base_url}/your-order-is-getting-packed/?order-id={order_id}')
             else:
                 logger.info("Order not in completed/processing status, redirecting to appropriate page")
-                if type_param == 'F':
-                    return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
-                else:
-                    return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
+                return not_found_redirect(order_id, type_param)
 
         elif response.status_code == 404:
             logger.warning(f"Order {order_id} not found in WooCommerce")
-            if type_param == 'F':
-                return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
-            else:
-                return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
+            return not_found_redirect(order_id, type_param)
         else:
             logger.error(f"WooCommerce API error: {response.status_code}, {response.text}")
             return f"Error retrieving order details: {response.status_code}", 500
 
     except Exception as e:
         logger.error(f"General error in check_woo: {e}", exc_info=True)
-        if type_param == 'F':
-            return redirect(f'https://figureshub.in/your-order-is-getting-packed/?order-id={order_id}')
-        else:
-            return redirect(f'https://tcghub.in/no-order/?order-id={order_id}')
+        return not_found_redirect(order_id, type_param)
 
 
 @app.route('/order-data', methods=['GET'])
